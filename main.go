@@ -3,16 +3,28 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"github.com/iglov/netbox-agent/lib/dmidecode"
 	"github.com/iglov/netbox-agent/lib/ipmi"
 	"github.com/joho/godotenv"
-	"log"
+	"github.com/sirupsen/logrus"
 	"os"
 	"strings"
 
 	"github.com/netbox-community/go-netbox/v4"
 )
+
+var (
+	version  = flag.Bool("v", false, "Print current version and exit.")
+	logLevel = flag.String("loglevel", "info", "Set log level: DEBUG, INFO, WARN, ERROR")
+)
+
+// Version contains main version of build. Get from compiler variables
+var Version string
+
+// Initiate log
+var log = logrus.New()
 
 type FullSystemInfo struct {
 	Memory  []dmidecode.MemoryDeviceInfo `json:"memory"`
@@ -24,16 +36,33 @@ type FullSystemInfo struct {
 
 func main() {
 
+	flag.Parse()
+
+	if *version {
+		fmt.Println(Version)
+		os.Exit(0)
+	}
+
+	// Set log output to stdout
+	log.Out = os.Stdout
+
+	// Parse the log level and set it
+	level, err := logrus.ParseLevel(strings.ToLower(*logLevel))
+	if err != nil {
+		log.Fatalf("Invalid log level: %s", *logLevel)
+	}
+	log.SetLevel(level)
+
 	// Fetch memory device information
 	memDevices, err := dmidecode.GetMemoryDevices()
 	if err != nil {
-		log.Fatalf("Error fetching memory devices: %v", err)
+		log.Fatalf("Error fetching memory devices: %s", err)
 	}
 
 	// Fetch CPU information
 	cpuInfo, err := dmidecode.GetCPUInfo()
 	if err != nil {
-		log.Fatalf("Error fetching CPU information: %v", err)
+		log.Fatalf("Error fetching CPU information: %s", err)
 	}
 
 	// Fetch IPMI information
@@ -42,13 +71,13 @@ func main() {
 	// Fetch chassis information
 	chassisInfo, err := dmidecode.GetChassisInfo()
 	if err != nil {
-		log.Fatalf("Error fetching chassis information: %v", err)
+		log.Fatalf("Error fetching chassis information: %s", err)
 	}
 
 	// Fetch system information
 	systemInfo, err := dmidecode.GetSystemInfo()
 	if err != nil {
-		log.Fatalf("Error fetching system information: %v", err)
+		log.Fatalf("Error fetching system information: %s", err)
 	}
 
 	// Combine memory and CPU data into SystemInfo struct
@@ -63,15 +92,14 @@ func main() {
 	// Convert the SystemInfo struct to JSON
 	finalJSON, err := json.MarshalIndent(fullSystemInfo, "", "  ")
 	if err != nil {
-		log.Fatalf("Error marshalling final JSON: %v", err)
+		log.Fatalf("Error marshalling final JSON: %s", err)
 	}
 
-	// Print the final JSON
-	fmt.Println(string(finalJSON))
+	log.Debug(string(finalJSON))
 
 	err = godotenv.Load()
 	if err != nil {
-		log.Printf("Error loading .env , using local variables")
+		log.Warn("Error loading .env , using local variables")
 	}
 
 	ctx := context.Background()
@@ -88,15 +116,15 @@ func main() {
 	response1, httpRes1, err := c.DcimAPI.DcimDeviceRolesCreate(ctx).DeviceRoleRequest(*roleRequest).Execute()
 
 	if err != nil {
-		log.Printf("Error creating device: %v", err)
+		log.Errorf("Error creating role: %s", err)
 	}
 
-	log.Printf("Response: %+v", response1)
-	log.Printf("HTTP Response: %+v", httpRes1)
+	log.Debugf("Response: %+v", response1)
+	log.Debugf("HTTP Response: %+v", httpRes1)
 
 	hostname, err := os.Hostname()
 	if err != nil {
-		log.Printf("Error get hostname: %v", err)
+		log.Errorf("Error get hostname: %s", err)
 	}
 
 	site := strings.Split(hostname, ".")[1]
@@ -119,6 +147,19 @@ func main() {
 	chassisVersionHyphenated := strings.ReplaceAll(chassisVersionLower, " ", "-")
 	chassisVendorName := chassisVendorLower + "-" + chassisVersionHyphenated
 
+	siteRequest := netbox.NewWritableSiteRequestWithDefaults()
+	siteRequest.SetName(site)
+	siteRequest.SetSlug(site)
+	siteRequest.SetDescription("It's just a default Site after server creation by API, it should be changed after server creation.")
+	response2, httpRes2, err := c.DcimAPI.DcimSitesCreate(ctx).WritableSiteRequest(*siteRequest).Execute()
+
+	if err != nil {
+		log.Errorf("Error creating site: %s", err)
+	}
+
+	log.Debugf("Response: %+v", response2)
+	log.Debugf("HTTP Response: %+v", httpRes2)
+
 	// add blade chassis
 	if chassisSerial != productSerial {
 		device := netbox.NewWritableDeviceWithConfigContextRequestWithDefaults()
@@ -132,11 +173,11 @@ func main() {
 		response, httpRes, err := c.DcimAPI.DcimDevicesCreate(ctx).WritableDeviceWithConfigContextRequest(*device).Execute()
 
 		if err != nil {
-			log.Printf("Error creating device: %v", err)
+			log.Errorf("Error creating device: %v", err)
 		}
 
-		log.Printf("Response: %+v", response)
-		log.Printf("HTTP Response: %+v", httpRes)
+		log.Debugf("Response: %+v", response)
+		log.Debugf("HTTP Response: %+v", httpRes)
 
 	}
 
@@ -152,11 +193,11 @@ func main() {
 	response, httpRes, err := c.DcimAPI.DcimDevicesCreate(ctx).WritableDeviceWithConfigContextRequest(*device).Execute()
 
 	if err != nil {
-		log.Printf("Error creating device: %v", err)
+		log.Errorf("Error creating device: %v", err)
 	}
 
-	log.Printf("Response: %+v", response)
-	log.Printf("HTTP Response: %+v", httpRes)
+	log.Debugf("Response: %+v", response)
+	log.Debugf("HTTP Response: %+v", httpRes)
 
 	for i := range fullSystemInfo.CPU {
 		inv := netbox.NewInventoryItemRequestWithDefaults()
@@ -167,27 +208,27 @@ func main() {
 			"cpu_threads": fullSystemInfo.CPU[i].ThreadCount,
 		})
 		inv.SetDevice(netbox.DeviceRequest{Name: *netbox.NewNullableString(&hostname)})
-		r1, r2, err := c.DcimAPI.DcimInventoryItemsCreate(context.Background()).InventoryItemRequest(*inv).Execute()
+		r1, r2, err := c.DcimAPI.DcimInventoryItemsCreate(ctx).InventoryItemRequest(*inv).Execute()
 
 		if err != nil {
-			log.Printf("Error creating device: %v", err)
+			log.Errorf("Error creating device: %v", err)
 		}
 
-		log.Printf("Response: %+v", r1)
-		log.Printf("HTTP Response: %+v", r2)
+		log.Debugf("Response: %+v", r1)
+		log.Debugf("HTTP Response: %+v", r2)
 	}
 
 	for i := range fullSystemInfo.Memory {
 		man := netbox.NewManufacturerRequestWithDefaults()
 		man.SetName(fullSystemInfo.Memory[i].Manufacturer)
 		man.SetSlug(strings.ToLower(fullSystemInfo.Memory[i].Manufacturer))
-		m1, m2, err := c.DcimAPI.DcimManufacturersCreate(context.Background()).ManufacturerRequest(*man).Execute()
+		m1, m2, err := c.DcimAPI.DcimManufacturersCreate(ctx).ManufacturerRequest(*man).Execute()
 		if err != nil {
-			log.Printf("Error creating device: %v", err)
+			log.Errorf("Error creating device: %v", err)
 		}
 
-		log.Printf("Response: %+v", m1)
-		log.Printf("HTTP Response: %+v", m2)
+		log.Debugf("Response: %+v", m1)
+		log.Debugf("HTTP Response: %+v", m2)
 
 		inv := netbox.NewInventoryItemRequestWithDefaults()
 		inv.SetName("MEMORY")
@@ -201,27 +242,27 @@ func main() {
 			"memory_type":  fullSystemInfo.Memory[i].Type,
 		})
 		inv.SetDevice(netbox.DeviceRequest{Name: *netbox.NewNullableString(&hostname)})
-		r1, r2, err := c.DcimAPI.DcimInventoryItemsCreate(context.Background()).InventoryItemRequest(*inv).Execute()
+		r1, r2, err := c.DcimAPI.DcimInventoryItemsCreate(ctx).InventoryItemRequest(*inv).Execute()
 
 		if err != nil {
-			log.Printf("Error creating device: %v", err)
+			log.Errorf("Error creating device: %v", err)
 		}
 
-		log.Printf("Response: %+v", r1)
-		log.Printf("HTTP Response: %+v", r2)
+		log.Debugf("Response: %+v", r1)
+		log.Debugf("HTTP Response: %+v", r2)
 	}
 
 	int1 := netbox.NewWritableInterfaceRequestWithDefaults()
 	int1.SetName("IMPI")
 	int1.SetDevice(netbox.DeviceRequest{Name: *netbox.NewNullableString(&hostname)})
 	int1.SetType("1000base-tx")
-	rr1, rr2, err := c.DcimAPI.DcimInterfacesCreate(context.Background()).WritableInterfaceRequest(*int1).Execute()
+	rr1, rr2, err := c.DcimAPI.DcimInterfacesCreate(ctx).WritableInterfaceRequest(*int1).Execute()
 
 	if err != nil {
-		log.Printf("Error creating device: %v", err)
+		log.Errorf("Error creating device: %v", err)
 	}
 
-	log.Printf("Response: %+v", rr1)
-	log.Printf("HTTP Response: %+v", rr2)
+	log.Debugf("Response: %+v", rr1)
+	log.Debugf("HTTP Response: %+v", rr2)
 
 }
