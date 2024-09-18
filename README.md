@@ -2,7 +2,7 @@
 [![GitHub license](https://img.shields.io/github/license/iglov/netbox-agent.svg)](https://github.com/iglov/netbox-agent/blob/master/LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/iglov/netbox-agent)](https://goreportcard.com/report/github.com/iglov/netbox-agent)
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/iglov/netbox-agent)
-[![Build Status](https://github.com/iglov/netbox-agent/actions/workflows/build.yml/badge.svg)](https://github.com/iglov/netbox-agent/actions)
+[![Build Status](https://github.com/iglov/netbox-agent/actions/workflows/main.yml/badge.svg)](https://github.com/iglov/netbox-agent/actions)
 [![codecov](https://codecov.io/gh/iglov/netbox-agent/branch/main/graph/badge.svg)](https://codecov.io/gh/iglov/netbox-agent)
 
 # netbox-agent
