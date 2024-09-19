@@ -51,7 +51,7 @@ golangci-lint: install-golangci-lint
 		golangci-lint run --exclude '(SA4003|SA1019|SA5011):' -E contextcheck -E decorder --timeout 2m
 
 install-golangci-lint:
-		which golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v1.60.1
+		which golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v1.61.0
 
 check: fmt vet lint errcheck golangci-lint govulncheck
 

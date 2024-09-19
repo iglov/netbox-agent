@@ -6,6 +6,7 @@ import (
 
 // CPUInfo holds the details of a CPU.
 type CPUInfo struct {
+	Manufacturer      string `json:"manufacturer"`
 	SocketDesignation string `json:"socket_designation"`
 	Version           string `json:"version"`
 	CoreCount         uint8  `json:"core_count"`
@@ -29,6 +30,7 @@ func GetCPUInfo() ([]CPUInfo, error) {
 	var cpus []CPUInfo
 	for _, cpu := range cpuInfo {
 		cpus = append(cpus, CPUInfo{
+			Manufacturer:      cpu.Manufacturer,
 			SocketDesignation: cpu.SocketDesignation,
 			Version:           cpu.Version,
 			CoreCount:         cpu.CoreCount,

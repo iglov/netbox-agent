@@ -45,7 +45,7 @@ func GetMemoryDevices() ([]MemoryDeviceInfo, error) {
 
 		// Add the device to the list
 		memoryDevices = append(memoryDevices, MemoryDeviceInfo{
-			Size:          device.Size,
+			Size:          device.Size / 1024, // To Gbs
 			FormFactor:    device.FormFactor.String(),
 			Speed:         device.Speed,
 			Type:          device.Type.String(),
