@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/iglov/netbox-agent/lib/dmidecode"
 	"github.com/iglov/netbox-agent/lib/ipmi"
+	"github.com/iglov/netbox-agent/lib/storage"
 	"github.com/joho/godotenv"
 	"github.com/sirupsen/logrus"
 	"os"
@@ -33,6 +34,7 @@ type FullSystemInfo struct {
 	IPMI    ipmi.BmcInfo                 `json:"ipmi"`
 	Chassis []dmidecode.ChassisInfo      `json:"chassis"`
 	System  []dmidecode.SystemInfo       `json:"system"`
+	Storage []storage.DiskInfo           `json:"storage"`
 }
 
 func main() {
@@ -81,13 +83,20 @@ func main() {
 		log.Fatalf("Error fetching system information: %s", err)
 	}
 
-	// Combine memory and CPU data into SystemInfo struct
+	// Fetch storage information
+	storageInfo, err := storage.GetStorageInfo()
+	if err != nil {
+		log.Fatalf("Error fetching storage information: %s", err)
+	}
+
+	// Combine all the data into SystemInfo struct
 	fullSystemInfo := FullSystemInfo{
 		Memory:  memDevices,
 		CPU:     cpuInfo,
 		Chassis: chassisInfo,
 		IPMI:    bmcInfo,
 		System:  systemInfo,
+		Storage: storageInfo,
 	}
 
 	// Convert the SystemInfo struct to JSON
@@ -97,6 +106,10 @@ func main() {
 	}
 
 	log.Debug(string(finalJSON))
+
+	//	if strings.Contains(*logLevel, "debug") {
+	//		os.Exit(0)
+	//	}
 
 	err = godotenv.Load()
 	if err != nil {
@@ -255,6 +268,39 @@ func main() {
 			"memory_slot":  fullSystemInfo.Memory[i].DeviceLocator,
 			"memory_speed": fullSystemInfo.Memory[i].Speed,
 			"memory_type":  fullSystemInfo.Memory[i].Type,
+		})
+		inv.SetDevice(netbox.DeviceRequest{Name: *netbox.NewNullableString(&hostname)})
+		invRes, httpRes, err := c.DcimAPI.DcimInventoryItemsCreate(ctx).InventoryItemRequest(*inv).Execute()
+
+		if err != nil {
+			log.Errorf("Error creating device: %v", err)
+		}
+
+		log.Debugf("Response: %+v", invRes)
+		log.Debugf("HTTP Response: %+v", httpRes)
+	}
+
+	for i := range fullSystemInfo.Storage {
+		man := netbox.NewManufacturerRequestWithDefaults()
+		man.SetName(fullSystemInfo.Storage[i].Manufacturer)
+		//		man.SetName("Intel")
+		man.SetSlug(strings.ToLower(fullSystemInfo.Storage[i].Manufacturer))
+		manRes, httpRes, err := c.DcimAPI.DcimManufacturersCreate(ctx).ManufacturerRequest(*man).Execute()
+		if err != nil {
+			log.Errorf("Error creating device: %v", err)
+		}
+
+		log.Debugf("Response: %+v", manRes)
+		log.Debugf("HTTP Response: %+v", httpRes)
+
+		inv := netbox.NewInventoryItemRequestWithDefaults()
+		inv.SetName("DISK")
+		inv.SetManufacturer(*man)
+		inv.SetPartId(fullSystemInfo.Storage[i].Model)
+		inv.SetSerial(fullSystemInfo.Storage[i].SerialNumber)
+		inv.SetCustomFields(map[string]interface{}{
+			"disk_size": fullSystemInfo.Storage[i].Size,
+			"disk_slot": fullSystemInfo.Storage[i].Slot,
 		})
 		inv.SetDevice(netbox.DeviceRequest{Name: *netbox.NewNullableString(&hostname)})
 		invRes, httpRes, err := c.DcimAPI.DcimInventoryItemsCreate(ctx).InventoryItemRequest(*inv).Execute()
