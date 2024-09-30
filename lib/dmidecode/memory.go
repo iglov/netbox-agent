@@ -49,7 +49,7 @@ func GetMemoryDevices() ([]MemoryDeviceInfo, error) {
 			FormFactor:    device.FormFactor.String(),
 			Speed:         device.Speed,
 			Type:          device.Type.String(),
-			Manufacturer:  device.Manufacturer,
+			Manufacturer:  strings.Trim(device.Manufacturer, " "),
 			SerialNumber:  device.SerialNumber,
 			AssetTag:      device.AssetTag,
 			PartNumber:    partNumber,
