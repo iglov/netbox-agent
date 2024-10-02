@@ -2,6 +2,7 @@ package dmidecode
 
 import (
 	"github.com/yumaojun03/dmidecode"
+	"strings"
 )
 
 // CPUInfo holds the details of a CPU.
@@ -30,7 +31,7 @@ func GetCPUInfo() ([]CPUInfo, error) {
 	var cpus []CPUInfo
 	for _, cpu := range cpuInfo {
 		cpus = append(cpus, CPUInfo{
-			Manufacturer:      cpu.Manufacturer,
+			Manufacturer:      strings.Trim(cpu.Manufacturer, " "),
 			SocketDesignation: cpu.SocketDesignation,
 			Version:           cpu.Version,
 			CoreCount:         cpu.CoreCount,
